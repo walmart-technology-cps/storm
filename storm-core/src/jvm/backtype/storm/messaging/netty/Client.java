@@ -308,6 +308,7 @@ public class Client extends ConnectionWithStatus implements IStatefulObject {
             return channel;
         } else {
             // Closing the channel and reconnecting should be done before handling the messages.
+            LOG.warn("Connection not established, closing and reconnecting to {}", dstAddressPrefixedName);
             boolean reconnectScheduled = closeChannelAndReconnect(channel);
             if (reconnectScheduled) {
                 // Log the connection error only once

@@ -37,6 +37,11 @@ public class StormClientHandler extends SimpleChannelUpstreamHandler  {
     }
 
     @Override
+    public void channelDisconnected(ChannelHandlerContext ctx, ChannelStateEvent e) throws Exception {
+        LOG.warn("Channel was disconnected from: " + client.dstAddressPrefixedName);
+    }
+
+    @Override
     public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent event) {
         Throwable cause = event.getCause();
         if (!(cause instanceof ConnectException)) {
