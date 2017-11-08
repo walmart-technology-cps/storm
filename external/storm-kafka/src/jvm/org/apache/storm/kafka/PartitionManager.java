@@ -21,6 +21,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
 import java.io.Serializable;
 
+import org.apache.kafka.common.KafkaException;
 import org.apache.storm.Config;
 import org.apache.storm.kafka.KafkaSpout.EmitState;
 import org.apache.storm.kafka.trident.MaxMetric;
@@ -274,22 +275,28 @@ public class PartitionManager {
         if (msgs != null) {
             int numMessages = 0;
 
-            for (MessageAndOffset msg : msgs) {
-                final Long cur_offset = msg.offset();
-                if (cur_offset < offset) {
-                    // Skip any old offsets.
-                    continue;
-                }
-                if (processingNewTuples || this._failedMsgRetryManager.shouldReEmitMsg(cur_offset)) {
-                    numMessages += 1;
-                    if (!_pending.containsKey(cur_offset)) {
-                        _pending.put(cur_offset, System.currentTimeMillis());
+            Iterator<MessageAndOffset> iterator = msgs.iterator();
+            while (iterator.hasNext()) {
+                try {
+                    MessageAndOffset msg = iterator.next();
+                    final Long cur_offset = msg.offset();
+                    if (cur_offset < offset) {
+                        // Skip any old offsets.
+                        continue;
                     }
-                    _waitingToEmit.add(msg);
-                    _emittedToOffset = Math.max(msg.nextOffset(), _emittedToOffset);
-                    if (_failedMsgRetryManager.shouldReEmitMsg(cur_offset)) {
-                        this._failedMsgRetryManager.retryStarted(cur_offset);
+                    if (processingNewTuples || this._failedMsgRetryManager.shouldReEmitMsg(cur_offset)) {
+                        numMessages += 1;
+                        if (!_pending.containsKey(cur_offset)) {
+                            _pending.put(cur_offset, System.currentTimeMillis());
+                        }
+                        _waitingToEmit.add(msg);
+                        _emittedToOffset = Math.max(msg.nextOffset(), _emittedToOffset);
+                        if (_failedMsgRetryManager.shouldReEmitMsg(cur_offset)) {
+                            this._failedMsgRetryManager.retryStarted(cur_offset);
+                        }
                     }
+                } catch (KafkaException ex) {
+                    LOG.error("Error occurred iterating messages {} for partition {}", msgs, _partition, ex);
                 }
             }
             _fetchAPIMessageCount.incrBy(numMessages);
